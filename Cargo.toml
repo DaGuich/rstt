@@ -1,5 +1,5 @@
 [package]
-name = "exes"
+name = "rstt"
 version = "0.0.1"
 authors = ["Matthias Gilch <matthias.gilch.mg@gmail.com>"]
 edition = "2018"
