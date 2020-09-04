@@ -1,4 +1,6 @@
-use crate::util::{decode_remaining_length, encode_remaining_length, encode_string};
+use anyhow::{anyhow, Result};
+
+use crate::util::{decode_remaining_length, decode_string, encode_remaining_length, encode_string};
 
 #[derive(Debug)]
 pub struct ConnectWill {
@@ -78,42 +80,64 @@ pub fn serialize(cd: &ConnectData) -> Vec<u8> {
     data
 }
 
-pub fn deserialize(pdata: &[u8]) -> Result<ConnectData, &'static str> {
+pub fn deserialize(pdata: &[u8]) -> Result<ConnectData> {
     let remaining_length = match decode_remaining_length(&pdata[1..]) {
         Ok(d) => d,
         Err(e) => return Err(e),
     };
     let remaining_length_len = encode_remaining_length(remaining_length).len();
 
-    let pdata = &pdata[(2 + remaining_length_len)..];
+    let pdata = &pdata[(1 + remaining_length_len)..];
 
+    let mut jump_size = 0usize;
     {
-        let protocol_name_length_bytes: [u8; 2] = [pdata[0], pdata[1]];
+        let (plen, pname) = match decode_string(pdata) {
+            Ok((len, name)) => (len, name),
+            Err(e) => {
+                return Err(e);
+            }
+        };
+        jump_size = plen;
 
-        if u16::from_be_bytes(protocol_name_length_bytes) != 4 {
-            return Err("Protocol name not in correct format");
-        }
-        let protocol_name = String::from_utf8_lossy(&pdata[2..5]);
-        if protocol_name != "MQTT" {
-            return Err("Protocol name not correct");
+        if pname != "MQTT" {
+            return Err(anyhow!("Protocol name is wrong"));
         }
     }
-
-    let pdata = &pdata[6..];
+    let pdata = &pdata[jump_size..];
+    jump_size = 0;
 
     {
         let protocol_version = pdata[0];
+        jump_size += 1;
         if protocol_version != 4 {
-            return Err("Protocol version not correct. Only 3.1.1 supported");
+            return Err(anyhow!(
+                "Protocol version not correct. Only 3.1.1 supported"
+            ));
         }
     }
+    let connect_flags = pdata[1];
+    jump_size += 1;
+    let clean_session = ((1 << 1) & connect_flags) != 0;
+    let will_flag = ((1 << 2) & connect_flags) != 0;
+    let will_qos = 0b0000_0011 & (connect_flags >> 3);
+    let will_retain_flag = ((1 << 5) & connect_flags) != 0;
+    let username_flag = ((1 << 7) & connect_flags) != 0;
+    let password_flag = ((1 << 6) & connect_flags) != 0;
 
-    // let pdata = &pdata[1..];
+    let pdata = &pdata[jump_size..];
+    jump_size = 0;
+    let keep_alive = {
+        let bytes = [pdata[0], pdata[1]];
+        jump_size += 2;
+        u16::from_be_bytes(bytes)
+    };
+    let pdata = &pdata[jump_size..];
+    jump_size = 0;
 
     Ok(ConnectData {
-        keep_alive: 0,
+        keep_alive,
+        clean_session,
         client_ident: String::from("abc"),
-        clean_session: false,
         username: None,
         password: None,
         will: None,

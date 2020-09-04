@@ -1,6 +1,8 @@
-pub fn encode_string(s: &str) -> Result<Vec<u8>, &'static str> {
+use anyhow::{anyhow, Result};
+
+pub fn encode_string(s: &str) -> Result<Vec<u8>> {
     if s.len() > u16::max_value() as usize {
-        return Err("String is too long");
+        return Err(anyhow!("String is too long"));
     }
     let mut data = Vec::<u8>::new();
     let stringbytes = (s.len() as u16).to_be_bytes();
@@ -10,6 +12,19 @@ pub fn encode_string(s: &str) -> Result<Vec<u8>, &'static str> {
     Ok(data)
 }
 
+pub fn decode_string(encoded: &[u8]) -> Result<(usize, String)> {
+    let length_bytes = [encoded[0], encoded[1]];
+    let length = u16::from_be_bytes(length_bytes);
+    let lower_range_limit = 2usize;
+    let upper_range_limit = (2 + length) as usize;
+    let raw_string = &encoded[lower_range_limit..upper_range_limit];
+    match String::from_utf8_lossy(raw_string).parse() {
+        Ok(string) => Ok(((length + 2) as usize, string)),
+        Err(_) => Err(anyhow!("String conversion failed")),
+    }
+}
+
+/// Encode the remaining length field according to MQTT spec 2.2.3
 pub fn encode_remaining_length(len: u32) -> Vec<u8> {
     let mut data = Vec::<u8>::new();
     let mut temp = len;
@@ -35,7 +50,7 @@ pub fn encode_remaining_length(len: u32) -> Vec<u8> {
 }
 
 /// Decode the remaining length field according to MQTT spec 2.2.3
-pub fn decode_remaining_length(encoded: &[u8]) -> Result<u32, &'static str> {
+pub fn decode_remaining_length(encoded: &[u8]) -> Result<u32> {
     let mut multiplier: u32 = 1;
     let mut value: u32 = 0;
     let mut inputiter = encoded.iter();
@@ -43,7 +58,7 @@ pub fn decode_remaining_length(encoded: &[u8]) -> Result<u32, &'static str> {
         let encoded_byte = match inputiter.next() {
             Some(b) => (*b) as u32,
             None => {
-                return Err("Could not fetch enough bytes");
+                return Err(anyhow!("Could not fetch enough bytes"));
             }
         };
         value += (encoded_byte & 0x7F) * multiplier;
@@ -53,7 +68,7 @@ pub fn decode_remaining_length(encoded: &[u8]) -> Result<u32, &'static str> {
         }
 
         if multiplier > ((0x80 * 0x80 * 0x80) as u32) {
-            return Err("Malformed remaining length");
+            return Err(anyhow!("Malformed remaining length"));
         }
     }
     Ok(value)

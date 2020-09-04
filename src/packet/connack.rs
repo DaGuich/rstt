@@ -1,5 +1,7 @@
 use crate::util::encode_remaining_length;
 
+use anyhow::{anyhow, Result};
+
 pub enum ConnRetCode {
     Accepted,
     WrongProtocolVersion,
@@ -37,6 +39,6 @@ pub fn serialize(cd: &ConnAckData) -> Vec<u8> {
     packet
 }
 
-pub fn deserialize(_pdata: &[u8]) -> Result<ConnAckData, &'static str> {
+pub fn deserialize(_pdata: &[u8]) -> Result<ConnAckData> {
     unimplemented!("Connect packet deserialization not implemented yet");
 }

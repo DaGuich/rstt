@@ -4,6 +4,8 @@ mod connect;
 use connack::ConnAckData;
 use connect::ConnectData;
 
+use anyhow::{anyhow, Result};
+
 pub enum PType {
     Connect(ConnectData),
     ConnAck(ConnAckData),
@@ -22,7 +24,7 @@ pub fn serialize(packet: PType) -> Vec<u8> {
     pbytes
 }
 
-pub fn deserialize(pbytes: &[u8]) -> Result<PType, &'static str> {
+pub fn deserialize(pbytes: &[u8]) -> Result<PType> {
     let packettype = pbytes[0] >> 4;
     match packettype {
         1 => {
@@ -36,9 +38,9 @@ pub fn deserialize(pbytes: &[u8]) -> Result<PType, &'static str> {
             let cd = connack::deserialize(&pbytes);
             match cd {
                 Ok(data) => Ok(PType::ConnAck(data)),
-                Err(e) => Err(e)
+                Err(e) => Err(e),
             }
         }
-        _ => Err("Packet not valid"),
+        _ => Err(anyhow!("Packet not valid")),
     }
 }
