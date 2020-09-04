@@ -1,10 +1,12 @@
 mod connack;
 mod connect;
 
+use connack::ConnAckData;
 use connect::ConnectData;
 
 pub enum PType {
     Connect(ConnectData),
+    ConnAck(ConnAckData),
 }
 
 pub fn serialize(packet: PType) -> Vec<u8> {
@@ -12,6 +14,9 @@ pub fn serialize(packet: PType) -> Vec<u8> {
     match packet {
         PType::Connect(data) => {
             pbytes.extend(connect::serialize(&data));
+        }
+        PType::ConnAck(data) => {
+            pbytes.extend(connack::serialize(&data));
         }
     }
     pbytes
@@ -25,6 +30,13 @@ pub fn deserialize(pbytes: &[u8]) -> Result<PType, &'static str> {
             match cd {
                 Ok(data) => Ok(PType::Connect(data)),
                 Err(e) => Err(e),
+            }
+        }
+        2 => {
+            let cd = connack::deserialize(&pbytes);
+            match cd {
+                Ok(data) => Ok(PType::ConnAck(data)),
+                Err(e) => Err(e)
             }
         }
         _ => Err("Packet not valid"),

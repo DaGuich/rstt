@@ -14,7 +14,7 @@ pub fn encode_remaining_length(len: u32) -> Vec<u8> {
     let mut data = Vec::<u8>::new();
     let mut temp = len;
 
-    while temp > 0 {
+    loop {
         let mut encoded = (temp % 128) as u8;
         temp /= 128;
 
@@ -22,6 +22,9 @@ pub fn encode_remaining_length(len: u32) -> Vec<u8> {
             encoded |= 0x80;
         }
         data.push(encoded);
+        if temp == 0 {
+            break;
+        }
     }
 
     if data.is_empty() {
@@ -31,27 +34,34 @@ pub fn encode_remaining_length(len: u32) -> Vec<u8> {
     data
 }
 
+/// Decode the remaining length field according to MQTT spec 2.2.3
 pub fn decode_remaining_length(encoded: &[u8]) -> Result<u32, &'static str> {
     let mut multiplier: u32 = 1;
     let mut value: u32 = 0;
     let mut inputiter = encoded.iter();
     loop {
-        let encoded_byte = *(inputiter.next().unwrap()) as u32;
-        value += (encoded_byte & 127u32) * multiplier;
-        if multiplier > ((128 * 128 * 128) as u32) {
+        let encoded_byte = match inputiter.next() {
+            Some(b) => (*b) as u32,
+            None => {
+                return Err("Could not fetch enough bytes");
+            }
+        };
+        value += (encoded_byte & 0x7F) * multiplier;
+        multiplier *= 128;
+        if multiplier > ((0x80 * 0x80 * 0x80) as u32) {
             return Err("Malformed remaining length");
         }
-        if (encoded_byte & 128) != 0 {
+
+        if (encoded_byte & 0x80) == 0 {
             break;
         }
-        multiplier *= 128;
     }
     Ok(value)
 }
 
 #[cfg(test)]
 mod test {
-    use super::{encode_remaining_length, encode_string};
+    use super::*;
 
     #[test]
     fn encode_string_success() {
@@ -63,7 +73,7 @@ mod test {
     }
 
     #[test]
-    fn remaining_length_success() {
+    fn encode_remaining_length_success() {
         {
             let rl = encode_remaining_length(5);
             assert_eq!(1, rl.len());
@@ -81,6 +91,40 @@ mod test {
             assert_eq!(0x80, rl[0]);
             assert_eq!(0x80, rl[1]);
             assert_eq!(0x01, rl[2]);
+        }
+    }
+
+    #[test]
+    fn decode_remaining_length_success() {
+        {
+            let input_length = 25;
+            let input = vec![25u8];
+            let length = decode_remaining_length(input.as_slice()).unwrap();
+            assert_eq!(input_length, length);
+        }
+        {
+            let input_length = 128;
+            let input = vec![0x80, 0x01];
+            let length = decode_remaining_length(input.as_slice()).unwrap();
+            assert_eq!(input_length, length);
+        }
+        {
+            let input_length = 16384;
+            let input = vec![0x80, 0x80, 0x01];
+            let length = decode_remaining_length(input.as_slice()).unwrap();
+            assert_eq!(input_length, length);
+        }
+        {
+            let input_length = 2097152;
+            let input = vec![0x80, 0x80, 0x80, 0x01];
+            let length = decode_remaining_length(input.as_slice()).unwrap();
+            assert_eq!(input_length, length);
+        }
+        {
+            let input_length = 2097151;
+            let input = vec![0xFF, 0xFF, 0x7F];
+            let length = decode_remaining_length(input.as_slice()).unwrap();
+            assert_eq!(input_length, length);
         }
     }
 }
