@@ -1,3 +1,4 @@
+mod handler;
 mod packet;
 mod util;
 
