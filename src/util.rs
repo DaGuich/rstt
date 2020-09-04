@@ -48,12 +48,12 @@ pub fn decode_remaining_length(encoded: &[u8]) -> Result<u32, &'static str> {
         };
         value += (encoded_byte & 0x7F) * multiplier;
         multiplier *= 128;
-        if multiplier > ((0x80 * 0x80 * 0x80) as u32) {
-            return Err("Malformed remaining length");
-        }
-
         if (encoded_byte & 0x80) == 0 {
             break;
+        }
+
+        if multiplier > ((0x80 * 0x80 * 0x80) as u32) {
+            return Err("Malformed remaining length");
         }
     }
     Ok(value)
