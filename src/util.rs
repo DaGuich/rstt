@@ -12,11 +12,12 @@ pub fn encode_string(s: &str) -> Result<Vec<u8>> {
     Ok(data)
 }
 
+/// Decode MQTT UTF-8 string
 pub fn decode_string(encoded: &[u8]) -> Result<(usize, String)> {
     let length_bytes = [encoded[0], encoded[1]];
     let length = u16::from_be_bytes(length_bytes);
     let lower_range_limit = 2usize;
-    let upper_range_limit = (2 + length) as usize;
+    let upper_range_limit = (1 + length) as usize;
     let raw_string = &encoded[lower_range_limit..upper_range_limit];
     match String::from_utf8_lossy(raw_string).parse() {
         Ok(string) => Ok(((length + 2) as usize, string)),
