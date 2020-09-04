@@ -134,13 +134,82 @@ pub fn deserialize(pdata: &[u8]) -> Result<ConnectData> {
     let pdata = &pdata[jump_size..];
     jump_size = 0;
 
+    let client_ident = match decode_string(pdata) {
+        Ok((len, ident)) => {
+            jump_size += len;
+            ident
+        }
+        Err(e) => {
+            return Err(e);
+        }
+    };
+
+    let pdata = &pdata[jump_size..];
+    jump_size = 0;
+    let will: Option<ConnectWill> = if will_flag {
+        let topic = match decode_string(pdata) {
+            Ok((len, s)) => {
+                jump_size += len;
+                s
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        };
+        let message = match decode_string(&pdata[jump_size..]) {
+            Ok((len, s)) => {
+                jump_size += len;
+                s
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        };
+        Some(ConnectWill {
+            topic,
+            message,
+            qos: 0,
+            retain: false,
+        })
+    } else {
+        None
+    };
+
+    let username = if username_flag {
+        match decode_string(&pdata[jump_size..]) {
+            Ok((len, s)) => {
+                jump_size += len;
+                Some(s)
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        }
+    } else {
+        None
+    };
+
+    let password = if username_flag && password_flag {
+        match decode_string(&pdata[jump_size..]) {
+            Ok((len, s)) => {
+                jump_size += len;
+                Some(s)
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        }
+    } else {
+        None
+    };
+
     Ok(ConnectData {
         keep_alive,
         clean_session,
-        client_ident: String::from("abc"),
-        username: None,
-        password: None,
-        will: None,
+        client_ident,
+        username,
+        password,
+        will,
     })
 }
 
@@ -149,14 +218,38 @@ mod test {
     use super::*;
 
     #[test]
-    fn in_and_out_success() {
+    fn in_and_out_simple_success() {
         let data_in = ConnectData {
             keep_alive: 60,
-            client_ident: String::from("abc"),
+            client_ident: "ident".to_string(),
             clean_session: false,
             username: None,
             password: None,
             will: None,
+        };
+        let data_out = deserialize(serialize(&data_in).as_mut_slice()).unwrap();
+        assert_eq!(data_in.keep_alive, data_out.keep_alive);
+        assert_eq!(data_in.client_ident, data_out.client_ident);
+        assert_eq!(data_in.clean_session, data_out.clean_session);
+        assert_eq!(data_in.username, data_out.username);
+        assert_eq!(data_in.password, data_out.password);
+        assert_eq!(data_in.will.is_none(), data_out.will.is_none());
+    }
+
+    #[test]
+    fn in_and_out_everything_success() {
+        let data_in = ConnectData {
+            keep_alive: 60,
+            client_ident: String::from("abc"),
+            clean_session: false,
+            username: Some("theuname".to_string()),
+            password: Some("thepword".to_string()),
+            will: Some(ConnectWill {
+                topic: "hilfe/abc".to_string(),
+                message: "12345678".to_string(),
+                qos: 2,
+                retain: true,
+            }),
         };
         let data_out = deserialize(serialize(&data_in).as_mut_slice()).unwrap();
         assert_eq!(data_in.keep_alive, data_out.keep_alive);
