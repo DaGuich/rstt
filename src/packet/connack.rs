@@ -1,7 +1,9 @@
+/// This module implements the ConnAck packet defined in MQTT spec 3.12
 use crate::util::{decode_remaining_length, encode_remaining_length};
 
 use anyhow::{anyhow, Result};
 
+/// Connection return code
 #[derive(Debug, PartialEq)]
 pub enum ConnRetCode {
     Accepted,
@@ -17,7 +19,7 @@ pub struct ConnAckData {
     session_present: bool,
     ret_code: ConnRetCode,
 }
-
+/// Serialize a ConnAck packet with its data
 pub fn serialize(cd: &ConnAckData) -> Vec<u8> {
     // data is everything from the variable header on
     let mut packet = Vec::<u8>::with_capacity(2);
@@ -41,6 +43,7 @@ pub fn serialize(cd: &ConnAckData) -> Vec<u8> {
     packet
 }
 
+/// Deserialize a ConnAck packet
 pub fn deserialize(pdata: &[u8]) -> Result<ConnAckData> {
     let remaining_length = decode_remaining_length(&pdata[1..])?;
     let rl_length = encode_remaining_length(remaining_length).len();
