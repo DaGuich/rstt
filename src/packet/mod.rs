@@ -9,6 +9,9 @@ use connect::ConnectData;
 
 use anyhow::{anyhow, Result};
 
+/// Packet Type
+///
+/// Holds packet data when there is some
 pub enum PType {
     Connect(ConnectData),
     ConnAck(ConnAckData),
@@ -19,11 +22,11 @@ pub enum PType {
 
 impl From<&[u8]> for PType {
     fn from(pdata: &[u8]) -> Self {
-        let t = deserialize(&pdata).unwrap();
-        t
+        deserialize(&pdata).unwrap()
     }
 }
 
+/// serialize a packet which is represented by the packet type
 pub fn serialize(packet: PType) -> Vec<u8> {
     let mut pbytes = Vec::<u8>::new();
     match packet {
@@ -46,6 +49,8 @@ pub fn serialize(packet: PType) -> Vec<u8> {
     pbytes
 }
 
+/// Deserialize a slice of bytes to a packet which is represented by a
+/// packet type
 pub fn deserialize(pbytes: &[u8]) -> Result<PType> {
     let packettype = pbytes[0] >> 4;
     match packettype {
