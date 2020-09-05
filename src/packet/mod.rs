@@ -1,5 +1,8 @@
 mod connack;
 mod connect;
+mod pingreq;
+mod pingresp;
+mod disconnect;
 
 use connack::ConnAckData;
 use connect::ConnectData;
