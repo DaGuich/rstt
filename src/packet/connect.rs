@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 
 use crate::util::{decode_remaining_length, decode_string, encode_remaining_length, encode_string};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConnectWill {
     topic: String,
     message: String,
@@ -168,8 +168,8 @@ pub fn deserialize(pdata: &[u8]) -> Result<ConnectData> {
         Some(ConnectWill {
             topic,
             message,
-            qos: 0,
-            retain: false,
+            qos: will_qos,
+            retain: will_retain_flag,
         })
     } else {
         None
@@ -192,7 +192,6 @@ pub fn deserialize(pdata: &[u8]) -> Result<ConnectData> {
     let password = if username_flag && password_flag {
         match decode_string(&pdata[jump_size..]) {
             Ok((len, s)) => {
-                jump_size += len;
                 Some(s)
             }
             Err(e) => {
@@ -238,18 +237,19 @@ mod test {
 
     #[test]
     fn in_and_out_everything_success() {
+        let will_in = ConnectWill {
+            topic: "hilfe/abc".to_string(),
+            message: "12345678".to_string(),
+            qos: 2,
+            retain: true,
+        };
         let data_in = ConnectData {
             keep_alive: 60,
             client_ident: String::from("abc"),
             clean_session: false,
             username: Some("theuname".to_string()),
             password: Some("thepword".to_string()),
-            will: Some(ConnectWill {
-                topic: "hilfe/abc".to_string(),
-                message: "12345678".to_string(),
-                qos: 2,
-                retain: true,
-            }),
+            will: Some(will_in.clone()),
         };
         let data_out = deserialize(serialize(&data_in).as_mut_slice()).unwrap();
         assert_eq!(data_in.keep_alive, data_out.keep_alive);
@@ -258,5 +258,12 @@ mod test {
         assert_eq!(data_in.username, data_out.username);
         assert_eq!(data_in.password, data_out.password);
         assert_eq!(data_in.will.is_none(), data_out.will.is_none());
+        if !data_out.will.is_none() {
+            let will_out = data_out.will.unwrap();
+            assert_eq!(will_in.retain, will_out.retain);
+            assert_eq!(will_in.qos, will_out.qos);
+            assert_eq!(will_in.topic, will_out.topic);
+            assert_eq!(will_in.message, will_out.message);
+        }
     }
 }
