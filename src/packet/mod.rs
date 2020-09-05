@@ -24,13 +24,6 @@ impl From<&[u8]> for PType {
     }
 }
 
-// impl<'a> Into<&'a [u8]> for PType {
-//     fn into(self) -> &'a [u8] {
-//         let pdata = serialize(self);
-//         pdata.as_slice()
-//     }
-// }
-
 pub fn serialize(packet: PType) -> Vec<u8> {
     let mut pbytes = Vec::<u8>::new();
     match packet {
