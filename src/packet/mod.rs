@@ -12,6 +12,9 @@ use anyhow::{anyhow, Result};
 pub enum PType {
     Connect(ConnectData),
     ConnAck(ConnAckData),
+    PingReq,
+    PingResp,
+    Disconnect,
 }
 
 pub fn serialize(packet: PType) -> Vec<u8> {
@@ -22,6 +25,15 @@ pub fn serialize(packet: PType) -> Vec<u8> {
         }
         PType::ConnAck(data) => {
             pbytes.extend(connack::serialize(&data));
+        },
+        PType::PingReq => {
+            pbytes.extend(pingreq::serialize());
+        },
+        PType::PingResp => {
+            pbytes.extend(pingresp::serialize());
+        },
+        PType::Disconnect => {
+            pbytes.extend(disconnect::serialize());
         }
     }
     pbytes
@@ -43,7 +55,28 @@ pub fn deserialize(pbytes: &[u8]) -> Result<PType> {
                 Ok(data) => Ok(PType::ConnAck(data)),
                 Err(e) => Err(e),
             }
-        }
+        },
+        12 => {
+            let res = pingreq::deserialize(&pbytes);
+            match res {
+                Ok(_) => Ok(PType::PingReq),
+                Err(e) => Err(e),
+            }
+        },
+        13 => {
+            let res = pingresp::deserialize(&pbytes);
+            match res {
+                Ok(_) => Ok(PType::PingResp),
+                Err(e) => Err(e),
+            }
+        },
+        14 => {
+            let res = disconnect::deserialize(&pbytes);
+            match res {
+                Ok(_) => Ok(PType::Disconnect),
+                Err(e) => Err(e),
+            }
+        },
         _ => Err(anyhow!("Packet not valid")),
     }
 }
