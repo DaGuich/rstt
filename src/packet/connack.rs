@@ -1,4 +1,4 @@
-use crate::util::{encode_remaining_length, decode_remaining_length};
+use crate::util::{decode_remaining_length, encode_remaining_length};
 
 use anyhow::{anyhow, Result};
 
@@ -44,19 +44,21 @@ pub fn serialize(cd: &ConnAckData) -> Vec<u8> {
 pub fn deserialize(pdata: &[u8]) -> Result<ConnAckData> {
     let remaining_length = decode_remaining_length(&pdata[1..])?;
     let rl_length = encode_remaining_length(remaining_length).len();
-    let connack_flags = pdata[(1+rl_length)];
-    let ret_code = match pdata[(1+rl_length+1)] {
+    let connack_flags = pdata[(1 + rl_length)];
+    let ret_code = match pdata[(1 + rl_length + 1)] {
         0 => ConnRetCode::Accepted,
         1 => ConnRetCode::WrongProtocolVersion,
         2 => ConnRetCode::IdentifierRejected,
         3 => ConnRetCode::ServerUnavailable,
         4 => ConnRetCode::BadUsernameOrPassword,
         5 => ConnRetCode::NotAuthorized,
-        _ => {return Err(anyhow!("Return code is malformated"));}
+        _ => {
+            return Err(anyhow!("Return code is malformated"));
+        }
     };
     Ok(ConnAckData {
         session_present: ((connack_flags & 0x01) != 0),
-        ret_code
+        ret_code,
     })
 }
 
